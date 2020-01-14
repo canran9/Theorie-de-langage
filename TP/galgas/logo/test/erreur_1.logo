@@ -1,0 +1,6 @@
+PROGRAM
+ ROUTINE routine
+ BEGIN
+ CALL routine ;
+ END
+BEGIN END.
