@@ -1,0 +1,36 @@
+stages:
+  - build
+  - build-docker
+  - deploy
+
+build:
+  stage: build
+  image: mozilla/sbt:latest
+  script:
+    - sbt run
+  artifacts:
+    paths:
+      - index.html
+
+build-docker:
+  stage: build-docker
+  image: docker:stable
+  services:
+    - docker:dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker build --pull -t "$CI_REGISTRY_IMAGE" -f Dockerfile .
+    - docker push "$CI_REGISTRY_IMAGE"
+
+deploy-image:
+  stage: deploy
+  image: kroniak/ssh-client:latest
+  before_script:
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan $PROD_SERVER_IP >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+  script:
+    - ssh -p $SSH_PORT root@$PROD_SERVER_IP "docker pull $CI_REGISTRY_IMAGE && docker stop \$(docker ps -aq) && docker rm \$(docker ps -aq) && docker run -d --restart=unless-stopped -p 30000:80 $CI_REGISTRY_IMAGE"
