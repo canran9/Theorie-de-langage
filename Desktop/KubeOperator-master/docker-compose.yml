@@ -1,0 +1,49 @@
+version: "2.2"
+services:
+
+  api:
+    build: core
+    image: kube-operator/core:2.5.0
+    container_name: kubeops_api
+    command: 'web'
+    restart: always
+    privileged: true
+    tty: true
+    volumes:
+      - ./data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - terraform_data:/opt/kubeOperator-api/data/terraform
+      - celery_data:/opt/kubeOperator-api/data/celery
+      - /opt/kubeoperator/config.yml:/opt/kubeOperator-api/config.yml
+    healthcheck:
+      test: "curl localhost:8000"
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  task:
+    image: kube-operator/core:2.5.0
+    command: 'task'
+    container_name: kubeops_task
+    restart: always
+    privileged: true
+    tty: true
+    volumes:
+      - ./data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - terraform_data:/opt/kubeOperator-api/data/terraform
+      - /opt/kubeoperator/config.yml:/opt/kubeOperator-api/config.yml
+    healthcheck:
+      test: "ps axu | grep 'celery worker'"
+      interval: 10s
+      timeout: 10s
+      retries: 20
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  api_data:
+  terraform_data:
+networks:
+  default:
